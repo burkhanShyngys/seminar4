@@ -48,7 +48,7 @@ user_pref("browser.startup.homepage_override.buildID", "20190128144255");
 user_pref("browser.startup.homepage_override.mstone", "65.0");
 user_pref("browser.uiCustomization.state", "{\"placements\":{\"widget-overflow-fixed-list\":[],\"nav-bar\":[\"back-button\",\"forward-button\",\"stop-reload-button\",\"home-button\",\"customizableui-special-spring1\",\"urlbar-container\",\"customizableui-special-spring2\",\"downloads-button\",\"library-button\",\"sidebar-button\"],\"toolbar-menubar\":[\"menubar-items\"],\"TabsToolbar\":[\"tabbrowser-tabs\",\"new-tab-button\",\"alltabs-button\"],\"PersonalToolbar\":[\"personal-bookmarks\"]},\"seen\":[\"developer-button\"],\"dirtyAreaCache\":[\"nav-bar\"],\"currentVersion\":15,\"newElementCount\":2}");
 user_pref("browser.urlbar.placeholderName", "Google");
-user_pref("browser.urlbar.timesBeforeHidingSuggestionsHint", 3);
+user_pref("browser.urlbar.timesBeforeHidingSuggestionsHint", 2);
 user_pref("datareporting.policy.dataSubmissionPolicyAcceptedVersion", 2);
 user_pref("datareporting.policy.dataSubmissionPolicyNotifiedTime", "1549031803257");
 user_pref("devtools.onboarding.telemetry.logged", true);
