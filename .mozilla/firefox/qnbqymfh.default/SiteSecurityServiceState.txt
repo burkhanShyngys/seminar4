@@ -2,7 +2,7 @@ accounts.firefox.com:HSTS	0	17928	1564583804481,1,1,2
 snippets.cdn.mozilla.net:HSTS	0	17928	1580567801442,1,0,2
 api.github.com:HSTS	0	17928	1580568955926,1,1,2
 vesta-1.web.telegram.org:HSTS	0	17928	1564799955363,1,0,2
-venus.web.telegram.org:HSTS	0	17928	1564801308230,1,0,2
+venus.web.telegram.org:HSTS	0	17928	1564801614939,1,0,2
 services.addons.mozilla.org:HSTS	0	17928	1580568335984,1,0,2
 www.mozilla.org:HSTS	0	17928	1580567800622,1,0,2
 services.addons.mozilla.org:HPKP	0	17928	1554216335985,1,1,WoiWRyIOVNa9ihaBciRSC7XHjliYS9VwUGOIud4PB18=r/mIkG3eEpVdm+u/ko/cwxzOMo1bk4TyHIlByibiA5E=
@@ -12,7 +12,7 @@ github.com:HSTS	0	17928	1580568954968,1,1,2
 pluto-1.web.telegram.org:HSTS	0	17928	1564799947562,1,0,2
 versioncheck-bg.addons.mozilla.org:HPKP	0	17928	1554216333077,1,1,WoiWRyIOVNa9ihaBciRSC7XHjliYS9VwUGOIud4PB18=r/mIkG3eEpVdm+u/ko/cwxzOMo1bk4TyHIlByibiA5E=
 venus-1.web.telegram.org:HSTS	0	17928	1564799941418,1,0,2
-pluto.web.telegram.org:HSTS	0	17928	1564801309652,1,0,2
+pluto.web.telegram.org:HSTS	0	17928	1564801471575,1,0,2
 t.me:HSTS	0	17928	1584799880086,1,0,2
 vesta.web.telegram.org:HSTS	0	17928	1564799954321,1,0,2
 classify-client.services.mozilla.com:HSTS	0	17928	1580568068110,1,1,2
