@@ -1,0 +1,465 @@
+console.log('[SW] Push worker started')
+
+var pendingNotification = false
+
+var defaultBaseUrl
+switch (location.hostname) {
+  case 'localhost':
+    defaultBaseUrl = 'http://localhost:8000/app/index.html#/im'
+    break
+  case 'zhukov.github.io':
+    defaultBaseUrl = 'https://zhukov.github.io/webogram/#/im'
+    break
+  default:
+  case 'web.telegram.org':
+    defaultBaseUrl = 'https://' + location.hostname + '/#/im'
+}
+
+self.addEventListener('push', function(event) {
+  var obj = event.data.json()
+  console.log('[SW] push', obj)
+
+  var hasActiveWindows = false
+  var checksPromise = new Promise(function (resolve, reject) {
+    var nowTime = +(new Date())
+    Promise.all([getMuteUntil(), getLastAliveTime()]).then(function (result) {
+      var muteUntil = result[0]
+      var lastAliveTime = result[1]
+      return clients.matchAll({type: 'window'}).then(function(clientList) {
+        console.log('matched clients', clientList)
+        hasActiveWindows = clientList.length > 0
+        if (hasActiveWindows) {
+          console.log('Supress notification because some instance is alive')
+          return reject()
+        }
+        if (userInvisibleIsSupported() &&
+            muteUntil &&
+            nowTime < muteUntil) {
+          console.log('Supress notification because mute for ', Math.ceil((muteUntil - nowTime) / 60000), 'min')
+          return reject()
+        }
+        if (!obj.badge) {
+          return reject()
+        }
+        return resolve()
+      })
+    })
+  })
+
+  var notificationPromise = checksPromise.then(function () {
+    return Promise.all([getSettings(), getLang()]).then(function (result) {
+      return fireNotification(obj, result[0], result[1])
+    })
+  })
+
+  var closePromise = notificationPromise.catch(function () {
+    console.log('[SW] Closing all notifications on push', hasActiveWindows)
+    if (userInvisibleIsSupported() || hasActiveWindows) {
+      return closeAllNotifications()
+    }
+    return self.registration.showNotification('Telegram', {
+      tag: 'unknown_peer'
+    }).then(function () {
+      if (hasActiveWindows) {
+        return closeAllNotifications()
+      }
+      setTimeout(closeAllNotifications, hasActiveWindows ? 0 : 100)
+    }).catch(function (error) {
+      console.error('Show notification error', error)
+    })
+  })
+
+  event.waitUntil(closePromise)
+})
+
+self.addEventListener('install', function(event) {
+  event.waitUntil(self.skipWaiting());
+});
+self.addEventListener('activate', function(event) {
+  console.log('[SW] on activate')
+  event.waitUntil(self.clients.claim());
+});
+
+
+self.addEventListener('message', function(event) {
+  console.log('[SW] on message', event.data)
+  var client = event.ports && event.ports[0] || event.source
+  if (event.data.type == 'ping') {
+    if (event.data.localNotifications) {
+      lastAliveTime = +(new Date())
+      IDBManager.setItem('push_last_alive', lastAliveTime)
+    }
+
+    if (pendingNotification &&
+        client &&
+        'postMessage' in client) {
+      client.postMessage(pendingNotification)
+      pendingNotification = false
+    }
+
+    if (event.data.lang) {
+      lang = event.data.lang
+      IDBManager.setItem('push_lang', lang)
+    }
+    if (event.data.settings) {
+      settings = event.data.settings
+      IDBManager.setItem('push_settings', settings)
+    }
+  }
+  if (event.data.type == 'notifications_clear') {
+    closeAllNotifications()
+  }
+})
+
+function fireNotification(obj, settings, lang) {
+  var title = obj.title || 'Telegram'
+  var body = obj.description || ''
+  var icon = 'img/logo_share.png'
+  var peerID
+
+  if (obj.custom && obj.custom.channel_id) {
+    peerID = -obj.custom.channel_id
+  }
+  else if (obj.custom && obj.custom.chat_id) {
+    peerID = -obj.custom.chat_id
+  }
+  else {
+    peerID = obj.custom && obj.custom.from_id || 0
+  }
+  obj.custom.peerID = peerID
+  var tag = 'peer' + peerID
+
+  if (settings && settings.nopreview) {
+    title = 'Telegram'
+    body = lang.push_message_nopreview || 'You have a new message'
+    tag = 'unknown_peer'
+  }
+
+  console.log('[SW] show notify', title, body, icon, obj)
+
+  var notificationPromise = self.registration.showNotification(title, {
+    body: body,
+    icon: icon,
+    tag: tag,
+    data: obj,
+    actions: [
+      {
+        action: 'mute1d',
+        title: lang.push_action_mute1d || 'Mute for 24H'
+      },
+      {
+        action: 'push_settings',
+        title: lang.push_action_settings || 'Settings'
+      }
+    ]
+  })
+
+  return notificationPromise.then(function (event) {
+    if (event && event.notification) {
+      pushToNotifications(event.notification)
+    }
+    return Promise.resolve()
+  }).catch(function (error) {
+    console.error('Show notification promise', error)
+  })
+}
+
+
+var notifications = []
+function pushToNotifications(notification) {
+  if (notifications.indexOf(notification) == -1) {
+    notifications.push(notification)
+    notification.onclose = onCloseNotification
+  }
+}
+
+function onCloseNotification(event) {
+  removeFromNotifications(event.notification)
+}
+
+function removeFromNotifications(notification) {
+  var pos = notifications.indexOf(notification)
+  if (pos != -1) {
+    notifications.splice(pos, 1)
+  }
+}
+
+function closeAllNotifications() {
+  for (var i = 0, len = notifications.length; i < len; i++) {
+    try {
+      notifications[i].close()
+    } catch (e) {}
+  }
+
+  var promise
+  if ('getNotifications' in self.registration) {
+    promise = self.registration.getNotifications({}).then(function(notifications) {
+      for (var i = 0, len = notifications.length; i < len; i++) {
+        try {
+          notifications[i].close()
+        } catch (e) {}
+      }
+    }).catch(function (error) {
+      console.error('Offline register SW error', error)
+    })
+  } else {
+    promise = Promise.resolve()
+  }
+
+  notifications = []
+
+  return promise
+}
+
+
+self.addEventListener('notificationclick', function(event) {
+  var notification = event.notification
+  console.log('On notification click: ', notification.tag)
+  notification.close()
+
+  var action = event.action
+  if (action == 'mute1d' && userInvisibleIsSupported()) {
+    console.log('[SW] mute for 1d')
+    muteUntil = +(new Date()) + 86400000
+    IDBManager.setItem('push_mute_until', muteUntil)
+    return
+  }
+  if (!notification.data) {
+    return
+  }
+
+  var promise = clients.matchAll({
+    type: 'window'
+  }).then(function(clientList) {
+    notification.data.action = action
+    pendingNotification = {type: 'push_click', data: notification.data}
+    for (var i = 0; i < clientList.length; i++) {
+      var client = clientList[i]
+      if ('focus' in client) {
+        client.focus()
+        client.postMessage(pendingNotification)
+        pendingNotification = false
+        return
+      }
+    }
+    if (clients.openWindow) {
+      return getSettings().then(function (settings) {
+        return clients.openWindow(settings.baseUrl || defaultBaseUrl)
+      })
+    }
+  }).catch(function (error) {
+    console.error('Clients.matchAll error', error)
+  })
+
+  event.waitUntil(promise)
+})
+
+self.addEventListener('notificationclose', onCloseNotification)
+
+
+
+
+;(function () {
+  var dbName = 'keyvalue'
+  var dbStoreName = 'kvItems'
+  var dbVersion = 2
+  var openDbPromise
+  var idbIsAvailable = self.indexedDB !== undefined &&
+    self.IDBTransaction !== undefined
+
+  function isAvailable () {
+    return idbIsAvailable
+  }
+
+  function openDatabase () {
+    if (openDbPromise) {
+      return openDbPromise
+    }
+
+    return openDbPromise = new Promise(function (resolve, reject) {
+      try {
+        var request = indexedDB.open(dbName, dbVersion)
+        var createObjectStore = function (db) {
+          db.createObjectStore(dbStoreName)
+        }
+        if (!request) {
+          return reject()
+        }
+      } catch (error) {
+        console.error('error opening db', error.message)
+        idbIsAvailable = false
+        return reject(error)
+      }
+
+      var finished = false
+      setTimeout(function () {
+        if (!finished) {
+          request.onerror({type: 'IDB_CREATE_TIMEOUT'})
+        }
+      }, 3000)
+
+      request.onsuccess = function (event) {
+        finished = true
+        var db = request.result
+
+        db.onerror = function (error) {
+          idbIsAvailable = false
+          console.error('Error creating/accessing IndexedDB database', error)
+          reject(error)
+        }
+
+        resolve(db)
+      }
+
+      request.onerror = function (event) {
+        finished = true
+        idbIsAvailable = false
+        console.error('Error creating/accessing IndexedDB database', event)
+        reject(event)
+      }
+
+      request.onupgradeneeded = function (event) {
+        finished = true
+        console.warn('performing idb upgrade from', event.oldVersion, 'to', event.newVersion)
+        var db = event.target.result
+        if (event.oldVersion == 1) {
+          db.deleteObjectStore(dbStoreName)
+        }
+        createObjectStore(db)
+      }
+    })
+  }
+
+  function setItem (key, value) {
+    return openDatabase().then(function (db) {
+      try {
+        var objectStore = db.transaction([dbStoreName], IDBTransaction.READ_WRITE || 'readwrite').objectStore(dbStoreName)
+        var request = objectStore.put(value, key)
+      } catch (error) {
+        idbIsAvailable = false
+        return Promise.reject(error)
+      }
+
+      return new Promise(function(resolve, reject) {
+        request.onsuccess = function (event) {
+          resolve(value)
+        }
+
+        request.onerror = function (error) {
+          reject(error)
+        }
+      })
+    })
+  }
+
+  function getItem (key) {
+    return openDatabase().then(function (db) {
+      return new Promise(function(resolve, reject) {
+        var objectStore = db.transaction([dbStoreName], IDBTransaction.READ || 'readonly').objectStore(dbStoreName)
+        var request = objectStore.get(key)
+
+        request.onsuccess = function (event) {
+          var result = event.target.result
+          if (result === undefined) {
+            resolve()
+          } else {
+            resolve(result)
+          }
+        }
+
+        request.onerror = function (error) {
+          reject(error)
+        }
+      })
+      
+    })
+  }
+
+  openDatabase()
+
+  self.IDBManager = {
+    name: 'IndexedDB',
+    isAvailable: isAvailable,
+    setItem: setItem,
+    getItem: getItem
+  }
+})()
+
+
+var lastAliveTime, muteUntil, settings, lang
+
+function getMuteUntil() {
+  if (muteUntil !== undefined) {
+    return Promise.resolve(muteUntil)
+  }
+  return IDBManager.getItem('push_mute_until').then(function (newMuteUntil) {
+    return muteUntil = Math.max(muteUntil || 0, newMuteUntil || 0) || false
+  }).catch(function (error) {
+    console.error('IDB error', error)
+    return false
+  })
+}
+
+function getLastAliveTime() {
+  if (lastAliveTime !== undefined) {
+    return Promise.resolve(lastAliveTime)
+  }
+  return IDBManager.getItem('push_last_alive').then(function (newLastAliveTime) {
+    return lastAliveTime = Math.max(lastAliveTime || 0, newLastAliveTime || 0) || false
+  }).catch(function (error) {
+    console.error('IDB error', error)
+    return false
+  })
+}
+
+function getLang() {
+  if (lang !== undefined) {
+    return Promise.resolve(lang)
+  }
+  return IDBManager.getItem('push_lang').then(function (newLang) {
+    return lang = newLang || {}
+  }).catch(function (error) {
+    console.error('IDB error', error)
+    return {}
+  })
+}
+
+function getSettings() {
+  if (settings !== undefined) {
+    return Promise.resolve(settings)
+  }
+  return IDBManager.getItem('push_settings').then(function (newSettings) {
+    return settings = newSettings || {}
+  }).catch(function (error) {
+    console.error('IDB error', error)
+    return {}
+  })
+}
+
+function userInvisibleIsSupported() {
+  var isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1
+  return isFirefox ? true : false
+}
+(’Zª)Ò      \TY—\TY·?ÿx&\Tg§   \    :https://web.telegram.org/js/lib/push_worker.js?sw-precache=bae305ef892d7ba150d42872ae7c6bb5 necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 OK
+Server: nginx/1.12.2
+Date: Fri, 01 Feb 2019 14:37:43 GMT
+Content-Type: application/javascript
+Content-Length: 11737
+Last-Modified: Fri, 12 Jan 2018 17:28:54 GMT
+ETag: "5a58f056-2dd9"
+Expires: Fri, 01 Feb 2019 15:37:43 GMT
+Cache-Control: max-age=3600
+Strict-Transport-Security: max-age=35768000
+Accept-Ranges: bytes
+ original-response-headers Server: nginx/1.12.2
+Date: Fri, 01 Feb 2019 14:37:43 GMT
+Content-Type: application/javascript
+Content-Length: 11737
+Last-Modified: Fri, 12 Jan 2018 17:28:54 GMT
+Connection: keep-alive
+ETag: "5a58f056-2dd9"
+Expires: Fri, 01 Feb 2019 15:37:43 GMT
+Cache-Control: max-age=3600
+Strict-Transport-Security: max-age=35768000
+Accept-Ranges: bytes
+ uncompressed-len 0 net-response-time-onstart 31925 net-response-time-onstop 31926   -Ù
