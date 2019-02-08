@@ -1,15 +1,13 @@
 <?xml version="1.0"?>
 <application-state>
   <context id="">
-    <application id="gnome-control-center.desktop" open-window-count="1" score="6" last-seen="1549033734"/>
-    <application id="firefox.desktop" open-window-count="2" score="32" last-seen="1549033919"/>
-    <application id="gedit.desktop" open-window-count="0" score="0" last-seen="0"/>
-    <application id="org.gnome.Nautilus.desktop" open-window-count="1" score="24" last-seen="1549033663"/>
+    <application id="gnome-control-center.desktop" open-window-count="0" score="7" last-seen="1549034227"/>
+    <application id="firefox.desktop" open-window-count="0" score="40" last-seen="1549034789"/>
+    <application id="org.gnome.Nautilus.desktop" open-window-count="0" score="24" last-seen="1549034574"/>
     <application id="update-manager.desktop" open-window-count="0" score="0" last-seen="1549032997"/>
-    <application id="org.gnome.gedit.desktop" open-window-count="1" score="299" last-seen="1549033531"/>
+    <application id="org.gnome.gedit.desktop" open-window-count="0" score="299" last-seen="1549033531"/>
     <application id="gnome-terminal.desktop" open-window-count="0" score="0" last-seen="0"/>
-    <application id="gnome-user-accounts-panel.desktop" open-window-count="0" score="0" last-seen="0"/>
-    <application id="org.gnome.Terminal.desktop" open-window-count="1" score="489" last-seen="1549033861"/>
+    <application id="org.gnome.Terminal.desktop" open-window-count="1" score="992" last-seen="1549620905"/>
     <application id="gnome-initial-setup.desktop" open-window-count="0" score="2" last-seen="1549027805"/>
   </context>
 </application-state>
